@@ -123,7 +123,7 @@ if st.button("Analyze Donation"):
     # Convert location to coordinates
     geolocator = Nominatim(user_agent="food_donation_system")
 
-    location_data = geolocator.geocode(location)
+    location_data = geolocator.geocode(location, timeout=10)
 
     if location_data is not None:
 
