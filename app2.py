@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
 from sklearn.ensemble import RandomForestClassifier
 
@@ -15,35 +14,30 @@ ngo_data = {
         "Bright Future Daycare",
         "Helping Hands Shelter"
     ],
-
     "location": [
         "Whitefield",
         "Marathahalli",
         "Indiranagar",
         "KR Puram"
     ],
-
     "latitude": [
         12.9698,
         12.9591,
         12.9784,
         13.0080
     ],
-
     "longitude": [
         77.7500,
         77.6974,
         77.6408,
         77.6950
     ],
-
     "capacity": [
         50,
         30,
         40,
         60
     ],
-
     "type": [
         "Children",
         "Elderly",
@@ -55,16 +49,24 @@ ngo_data = {
 ngo_df = pd.DataFrame(ngo_data)
 
 # -----------------------------
+# LOCATION COORDINATES
+# -----------------------------
+
+location_coordinates = {
+    "Whitefield": (12.9698, 77.7500),
+    "Marathahalli": (12.9591, 77.6974),
+    "Indiranagar": (12.9784, 77.6408),
+    "KR Puram": (13.0080, 77.6950)
+}
+
+# -----------------------------
 # ML TRAINING DATA
 # -----------------------------
 
 food_training_data = {
     "quantity_kg": [20, 5, 15, 8, 25, 10, 30, 12, 18, 6],
-
     "hours_old": [2, 1, 5, 3, 6, 2, 7, 4, 5, 1],
-
     "temperature": [30, 25, 35, 28, 36, 29, 38, 32, 34, 26],
-
     "priority": [
         "High",
         "Low",
@@ -82,11 +84,9 @@ food_training_data = {
 food_df = pd.DataFrame(food_training_data)
 
 X = food_df[["quantity_kg", "hours_old", "temperature"]]
-
 y = food_df["priority"]
 
-model = RandomForestClassifier()
-
+model = RandomForestClassifier(random_state=42)
 model.fit(X, y)
 
 # -----------------------------
@@ -101,13 +101,24 @@ restaurant_name = st.text_input("Enter Restaurant Name")
 
 food_item = st.text_input("Enter Food Item")
 
-quantity = st.number_input("Enter Quantity in KG", min_value=1)
+quantity = st.number_input(
+    "Enter Quantity in KG",
+    min_value=1
+)
 
-location = st.text_input("Enter Location")
+location = st.selectbox(
+    "Select Location",
+    list(location_coordinates.keys())
+)
 
-hours_old = st.number_input("Hours Since Food Prepared", min_value=1)
+hours_old = st.number_input(
+    "Hours Since Food Prepared",
+    min_value=1
+)
 
-temperature = st.number_input("Current Temperature")
+temperature = st.number_input(
+    "Current Temperature"
+)
 
 # -----------------------------
 # BUTTON
@@ -115,77 +126,64 @@ temperature = st.number_input("Current Temperature")
 
 if st.button("Analyze Donation"):
 
-    # ML Prediction
     food_input = [[quantity, hours_old, temperature]]
 
     priority_prediction = model.predict(food_input)
 
-    # Convert location to coordinates
-    geolocator = Nominatim(user_agent="food_donation_system")
+    latitude, longitude = location_coordinates[location]
 
-    location_data = geolocator.geocode(location, timeout=10)
+    restaurant_coords = (latitude, longitude)
 
-    if location_data is not None:
+    distances = []
 
-        latitude = location_data.latitude
-        longitude = location_data.longitude
+    for _, row in ngo_df.iterrows():
 
-        restaurant_coords = (latitude, longitude)
-
-        distances = []
-
-        for index, row in ngo_df.iterrows():
-
-            ngo_coords = (row["latitude"], row["longitude"])
-
-            distance = geodesic(
-                restaurant_coords,
-                ngo_coords
-            ).km
-
-            distances.append(distance)
-
-        ngo_df["distance_km"] = distances
-
-        nearest_ngo = ngo_df.loc[
-            ngo_df["distance_km"].idxmin()
-        ]
-
-        # -----------------------------
-        # FINAL OUTPUT
-        # -----------------------------
-
-        st.success("Analysis Completed Successfully!")
-
-        st.subheader("AI Food Analysis")
-
-        st.write(
-            "Predicted Priority:",
-            priority_prediction[0]
+        ngo_coords = (
+            row["latitude"],
+            row["longitude"]
         )
 
-        st.subheader("Nearest NGO Recommendation")
+        distance = geodesic(
+            restaurant_coords,
+            ngo_coords
+        ).km
 
-        st.write(
-            "NGO Name:",
-            nearest_ngo["ngo_name"]
-        )
+        distances.append(distance)
 
-        st.write(
-            "Location:",
-            nearest_ngo["location"]
-        )
+    ngo_df["distance_km"] = distances
 
-        st.write(
-            "Distance:",
-            round(nearest_ngo["distance_km"], 2),
-            "KM"
-        )
+    nearest_ngo = ngo_df.loc[
+        ngo_df["distance_km"].idxmin()
+    ]
 
-        st.write(
-            "Type:",
-            nearest_ngo["type"]
-        )
+    st.success("Analysis Completed Successfully!")
 
-    else:
-        st.error("Location not found. Please enter valid location.")
+    st.subheader("AI Food Analysis")
+
+    st.write(
+        "Predicted Priority:",
+        priority_prediction[0]
+    )
+
+    st.subheader("Nearest NGO Recommendation")
+
+    st.write(
+        "NGO Name:",
+        nearest_ngo["ngo_name"]
+    )
+
+    st.write(
+        "Location:",
+        nearest_ngo["location"]
+    )
+
+    st.write(
+        "Distance:",
+        round(nearest_ngo["distance_km"], 2),
+        "KM"
+    )
+
+    st.write(
+        "Type:",
+        nearest_ngo["type"]
+    )
